@@ -75,3 +75,18 @@ struct js_moditem {
 jsval mod_irssi_get(void*);
 
 /* end mod_irssi.c */
+/* begin modules.c */
+
+typedef JSObject *module_hook(JSContext*);
+struct module {
+	JSObject *exports;
+	int id, type;
+	char *name;
+	module_hook *hook;
+};
+struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **global);
+struct module *modules_hook_native(JSContext *cx, module_hook *hook, const char *moduleid);
+void modules_delete(JSContext *cx, struct module *module);
+JSObject *modules_require(JSContext *cx, const char *moduleid);
+
+/* end modules.c */

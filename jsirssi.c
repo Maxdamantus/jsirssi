@@ -166,7 +166,7 @@ void js_freeenv(struct js_env *env){
 
 struct js_env *js_loadscript(char *fname, int hide, int force){
 	static char path[NAME_MAX + 1];
-	struct js_env *env;
+	struct js_env *env = NULL;
 	JSScript *script;
 	JSObject *glob, *scriptobj;
 	jsval rval;
