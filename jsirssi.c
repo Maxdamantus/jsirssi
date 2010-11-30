@@ -225,10 +225,11 @@ JSBool js_fun_print(JSContext *cx, uintN argc, jsval *vp){
 	int x;
 	char *st;
 
-	for(x = 0; x < argc; x++)
+	for(x = 0; x < argc; x++){
 		printtext_window(NULL, 0, "%s", st = JS_EncodeString(cx, JS_ValueToString(cx, JS_ARGV(js_cx, vp)[x])));
+		JS_free(cx, st);
+	}
 	JS_SET_RVAL(js_cx, vp, JSVAL_VOID);
-	JS_free(cx, st);
 	return JS_TRUE;
 }
 
