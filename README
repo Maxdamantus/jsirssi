@@ -1,0 +1,58 @@
+This isn't very useful yet. So far you can load scripts, scripts can load scripts, scripts can load
+interfaces (like "irssi"). The only interface available so far is "irssi", which lets you bind and
+unbind commands. Oh yeah, there's also a print() function.
+
+== Commands ==
+  * /js exec <code>
+      On startup, the js module creates a context called "<cmdline>" .. this lets you evaluate code in
+      this context.
+
+  * /js open <script>
+      This will *load* a script, from (by default) $HOME/.xchat/js/ - the path is figured out based on
+      Irssi's configured directory. Note that it does not necessarily execute the script (more in
+      JsLoad()).
+
+  * /js list [all]
+      This lists contexts which have been loaded and have not tried to exit - all shows all contexts
+      (currently only <cmdline> is hidden from the normal list).
+
+== Global values ==
+  A global object is created for every context; one for <cmdline> on module load, and one for each
+  script that gets executed. A set of standard objects should exist here too: Array, Object, etc.
+
+  * global
+      The global object (basically, window in a browser script, named to avoid confusion between
+      Irssi's windows).
+
+  * JsExit
+      A function that takes no arguments, and essentially unregisters the context from the list. This
+      does not necessarily clean up any resources that the script has made (they might be accessible
+      elsewhere) - it only allows the next `JsLoad()` or `/js open` to the script to force execution.
+
+  * JsExport
+      A function that takes one argument. A script (or context) has exactly one exported value (it
+      defaults to `undefined`), this lets you set that, so other scripts can access it through
+      `JsLoad()`. The value can be reset by calling JsExport again.
+
+  * JsLoad
+      A function that takes one argument. Currently, the only special values are "irssi", which creates
+      an Irssi-interfacing object, described below. Otherwise, it will execute the given script name
+      under a new context, only if it does not exist in the list. It will return the value currently
+      exported by the script. (So if the script has already been loaded, it will simply get the value
+      in the export slot of the script).
+
+  * print
+      A function that takes many arguments. Does a low-priority print to the current window for each
+      argument passed.
+
+== Irssi ==
+  An Irssi object can be created using JsLoad("irssi"). This lets you interact with Irssi, currently the
+  interface looks something like this (early development):
+
+  interface Irssi {
+      Bind bindCommand(string name, void callback(string arguments));
+  };
+
+  interface Bind {
+      void unbind();
+  };
