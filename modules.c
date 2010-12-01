@@ -125,8 +125,8 @@ JSObject *modules_require(JSContext *cx, const char *moduleid){
 	if(x == modules_c){
 		module = modules_create(cx, moduleid, &global);
 		if(!modules_runscript(cx, global, moduleid)){
-			return NULL;
 			modules_delete(cx, module);
+			return NULL;
 		}
 	}else
 		module = modules_a[x];
