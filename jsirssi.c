@@ -25,6 +25,8 @@ void js_core_init(){
 
 	modules_hook_native(js_cx, js_mod_test, "test");
 	modules_hook_native(js_cx, mod_irssi_get, "irssi");
+
+	modules_runscript(js_cx, global, "rc");
 }
 
 void js_core_deinit(){

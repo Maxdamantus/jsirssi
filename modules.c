@@ -11,7 +11,13 @@ static struct JSClass modules_class_global = {
 };
 
 static struct JSClass modules_class_exports = {
-	"Exports", JSCLASS_HAS_PRIVATE,
+	"Exports", 0,
+	JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+	JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub
+};
+
+static struct JSClass modules_class_module = {
+	"Module", 0,
 	JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
 	JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub
 };
@@ -30,6 +36,7 @@ static JSBool modules_fun_require(JSContext *cx, uintN argc, jsval *vp){
 
 struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **global){
 	struct module *module;
+	JSObject *moduleobj;
 	jsval tmp;
 
 	if(modules_c == 1000)
@@ -52,6 +59,11 @@ struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **gl
 	tmp = OBJECT_TO_JSVAL(JS_GetFunctionObject(JS_NewFunction(
 		cx, modules_fun_require, 1, 0, NULL, "require")));
 	JS_SetProperty(cx, *global, "require", &tmp);
+	moduleobj = JS_NewObject(cx, &modules_class_module, NULL, NULL);
+	tmp = OBJECT_TO_JSVAL(moduleobj);
+	JS_SetProperty(cx, *global, "module", &tmp);
+	tmp = STRING_TO_JSVAL(JS_NewStringCopyZ(cx, moduleid));
+	JS_SetProperty(cx, moduleobj, "id", &tmp);
 
 	return module;
 }
@@ -74,7 +86,7 @@ void modules_delete(JSContext *cx, struct module *module){
 	(modules_a[module->id] = modules_a[--modules_c])->id = module->id;
 
 	JS_free(cx, module->name);
-	if(module->name == MODULE_NORMAL)
+	if(module->type == MODULE_NORMAL)
 		JS_RemoveObjectRoot(cx, &module->o.exports);
 	JS_free(cx, module);
 }
@@ -84,12 +96,26 @@ void modules_shutdown(JSContext *cx){
 		modules_delete(cx, modules_a[0]);
 }
 
-JSObject *modules_require(JSContext *cx, const char *moduleid){
+JSBool modules_runscript(JSContext *cx, JSObject *global, const char *moduleid){
 	static char path[NAME_MAX + 1];
-	struct module *module;
-	JSObject *global, *scriptobj;
+	JSObject *scriptobj;
 	JSScript *script;
 	jsval rval;
+
+	snprintf(path, NAME_MAX + 1, "%s/js/%s.js", get_irssi_dir(), moduleid);
+	if(script = JS_CompileFile(cx, global, path)){
+		scriptobj = JS_NewScriptObject(cx, script);
+		JS_AddObjectRoot(cx, &scriptobj);
+		JS_ExecuteScript(cx, global, script, &rval);
+		JS_RemoveObjectRoot(cx, &scriptobj);
+		return JS_TRUE;
+	}
+	return JS_FALSE;
+}
+
+JSObject *modules_require(JSContext *cx, const char *moduleid){
+	struct module *module;
+	JSObject *global;
 	int x;
 
 	for(x = 0; x < modules_c; x++)
@@ -97,16 +123,10 @@ JSObject *modules_require(JSContext *cx, const char *moduleid){
 			break;
 
 	if(x == modules_c){
-		snprintf(path, NAME_MAX + 1, "%s/js/%s", get_irssi_dir(), moduleid);
 		module = modules_create(cx, moduleid, &global);
-		if(script = JS_CompileFile(cx, global, path)){
-			scriptobj = JS_NewScriptObject(cx, script);
-			JS_AddObjectRoot(cx, &scriptobj);
-			JS_ExecuteScript(cx, global, script, &rval);
-			JS_RemoveObjectRoot(cx, &scriptobj);
-		}else{
-			modules_delete(cx, module);
+		if(!modules_runscript(cx, global, moduleid)){
 			return NULL;
+			modules_delete(cx, module);
 		}
 	}else
 		module = modules_a[x];
