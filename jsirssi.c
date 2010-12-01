@@ -2,6 +2,8 @@
 
 /* get_irssi_dir() */
 
+JSObject *js_test_printer(JSContext *cx);
+
 void js_core_init(){
 	module_register("js", "core");
 
@@ -22,6 +24,9 @@ void js_core_init(){
 
 	js_cmdline = js_newenv("<cmdline>", 0, 1);
 	JS_SetGlobalObject(js_cx, js_setupglobal(js_cmdline));
+
+	modules_hook_native(js_cx, js_test_printer, "test");
+	modules_hook_native(js_cx, mod_irssi_get, "irssi");
 }
 
 void js_core_deinit(){
@@ -35,6 +40,17 @@ void js_core_deinit(){
 	command_unbind("js exec", (SIGNAL_FUNC)cmd_js_exec);
 	command_unbind("js list", (SIGNAL_FUNC)cmd_js_list);
 	command_unbind("js open", (SIGNAL_FUNC)cmd_js_open);
+}
+
+JSObject *js_test_printer(JSContext *cx){
+	JSObject *ret;
+	jsval tmp;
+
+	ret = JS_NewObject(cx, NULL, NULL, NULL);
+	JS_DefineFunctions(cx, ret, js_funs);
+	tmp = OBJECT_TO_JSVAL(JS_NewArrayObject(cx, 0, NULL));
+	JS_SetProperty(cx, ret, "a", &tmp);
+	return ret;
 }
 
 struct JSClass js_class_global = {
@@ -73,8 +89,11 @@ void js_envtracer(JSTracer *trc, JSObject *obj){
 		JS_CallTracer(trc, JSVAL_TO_TRACEABLE(env->exportval), JSVAL_TRACE_KIND(env->exportval));
 }
 
+JSBool modules_fun_require(JSContext *cx, uintN argc, jsval *vp);
+
 struct JSFunctionSpec js_funs[] = {
 	{"print", js_fun_print, 1},
+	{"require", modules_fun_require, 1},
 	{NULL}
 };
 

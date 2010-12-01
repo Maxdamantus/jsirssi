@@ -72,7 +72,7 @@ struct js_moditem {
 /* end modlist.c */
 /* begin mod_irssi.c */
 
-jsval mod_irssi_get(void*);
+JSObject* mod_irssi_get(JSContext*);
 
 /* end mod_irssi.c */
 /* begin modules.c */

@@ -13,7 +13,7 @@ static struct JSClass exports_class = {
 	JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub
 };
 
-static JSBool modules_fun_require(JSContext *cx, uintN argc, jsval *vp){
+/*static */ JSBool modules_fun_require(JSContext *cx, uintN argc, jsval *vp){
 	char *moduleid;
 	JSObject *exports;
 
@@ -92,7 +92,7 @@ JSObject *modules_require(JSContext *cx, const char *moduleid){
 		snprintf(path, NAME_MAX + 1, "%s/js/%s", get_irssi_dir(), moduleid);
 		module = modules_create(cx, moduleid, &global);
 		if(script = JS_CompileFile(cx, global, path)){
-			scriptobj = JS_NewScriptObject(js_cx, script);
+			scriptobj = JS_NewScriptObject(cx, script);
 			JS_AddObjectRoot(cx, &scriptobj);
 			JS_ExecuteScript(cx, global, script, &rval);
 			JS_RemoveObjectRoot(cx, &scriptobj);
@@ -103,10 +103,7 @@ JSObject *modules_require(JSContext *cx, const char *moduleid){
 	}else
 		module = modules_a[x];
 
-	if(module->type == MODULE_NATIVE){
-		module->type = MODULE_NORMAL;
-		module->exports = module->hook(cx);
-		JS_AddObjectRoot(cx, &module->exports);
-	}
+	if(module->type == MODULE_NATIVE)
+		return module->hook(cx);
 	return module->exports;
 }
