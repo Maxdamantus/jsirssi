@@ -7,7 +7,7 @@ INCLUDE = -I$(JPREFIX)/include -I$(IPREFIX)/include/js \
 CFLAGS += -DHAVE_CONFIG_H $(INCLUDE) `pkg-config --cflags glib-2.0` -fPIC -Wall -Wno-parentheses
 LDFLAGS += -L$(JPREFIX)/lib -lmozjs
 
-objects = jsirssi.o modlist.o mod_irssi.o modules.o
+objects = jsirssi.o mod_irssi.o modules.o
 
 libjs_core.so: $(objects)
 	ld $(LDFLAGS) -g -shared -soname $@ -fPIC -o $@ $(objects)

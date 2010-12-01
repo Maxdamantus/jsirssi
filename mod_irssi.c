@@ -21,11 +21,6 @@ static struct JSClass bind_class = {
 	JS_PropertyStub, JS_PropertyStub, bind_getprop, JS_PropertyStub,
 	JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, bind_freeer
 };
-/*
-static struct JSClass bind_class = JSCLASS_ROOBJ(
-	"Bind", JSCLASS_HAS_PRIVATE,
-	bind_getprop, JS_PropertyStub, bind_freeer, NULL);
-*/
 
 enum {
 	BIND_COMMAND, UNBIND_COMMAND
@@ -53,9 +48,7 @@ static void command_callback(char *args){
 	jsval rval, aval[1];
 
 	aval[0] = STRING_TO_JSVAL(JS_NewStringCopyZ(js_cx, args));
-	/* `this` will be the <commandline>'s global object */
-	/* no it won't; passing NULL here causes it to be the object of the global scope it's defined in */
-	JS_CallFunctionValue(js_cx, NULL /*JS_GetGlobalObject(js_cx)*/, *(jsval*)signal_user_data, 1, aval, &rval);
+	JS_CallFunctionValue(js_cx, NULL, *(jsval*)signal_user_data, 1, aval, &rval);
 }
 
 static void bind_freeer(JSContext *cx, JSObject *obj){
@@ -66,7 +59,6 @@ static void bind_freeer(JSContext *cx, JSObject *obj){
 		command_unbind_full(data->name, (SIGNAL_FUNC)command_callback, data);
 		JS_RemoveObjectRoot(cx, &data->obj);
 		JS_RemoveValueRoot(cx, &data->fun);
-/*		if(data->name) */
 		JS_free(cx, data->name);
 		JS_free(cx, data);
 		JS_SetPrivate(cx, obj, NULL);
@@ -101,7 +93,6 @@ static JSBool bind_getprop(JSContext *cx, JSObject *obj, jsid id, jsval *vp){
 
 static JSBool irssi_fun_bindCommand(JSContext *cx, uintN argc, jsval *vp){
 	struct callback_data *data;
-	JSObject *ret;
 
 	data = JS_malloc(cx, sizeof *data);
 	data->fun = JS_ARGV(cx, vp)[1];
@@ -109,10 +100,11 @@ static JSBool irssi_fun_bindCommand(JSContext *cx, uintN argc, jsval *vp){
 	data->name = JS_EncodeString(cx, JS_ValueToString(cx, JS_ARGV(cx, vp)[0]));
 	command_bind_data(data->name, NULL, (SIGNAL_FUNC)command_callback, data);
 	/* todo: return an object with .unbind */
-	ret = JS_NewObject(cx, &bind_class, NULL, NULL);
-	JS_SetPrivate(cx, ret, data);
-	JS_DefineProperties(js_cx, ret, bind_props);
-	JS_SET_RVAL(js_cx, vp, OBJECT_TO_JSVAL(ret));
+	data->obj = JS_NewObject(cx, &bind_class, NULL, NULL);
+	JS_AddObjectRoot(cx, &data->obj);
+	JS_SetPrivate(cx, data->obj, data);
+	JS_DefineProperties(js_cx, data->obj, bind_props);
+	JS_SET_RVAL(js_cx, vp, OBJECT_TO_JSVAL(data->obj));
 	return JS_TRUE;
 }
 
