@@ -21,6 +21,7 @@ typedef JSObject *module_hook(JSContext*);
 struct module {
 	int id, type;
 	char *name;
+	JSObject *moduleobj;
 	union {
 		JSObject *exports;
 		module_hook *hook;

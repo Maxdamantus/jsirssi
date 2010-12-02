@@ -17,7 +17,7 @@ static struct JSClass modules_class_exports = {
 };
 
 static struct JSClass modules_class_module = {
-	"Module", 0,
+	"Module", JSCLASS_HAS_PRIVATE,
 	JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
 	JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub
 };
@@ -34,9 +34,20 @@ static JSBool modules_fun_require(JSContext *cx, uintN argc, jsval *vp){
 	return JS_TRUE;
 }
 
+static JSBool modules_module_fun_remove(JSContext *cx, uintN argc, jsval *vp){
+	struct module *module;
+	jsval tmp;
+
+	JS_GetReservedSlot(js_cx, JSVAL_TO_OBJECT(JS_CALLEE(cx, vp)), 0, &tmp);
+	if(module = JS_GetPrivate(cx, JSVAL_TO_OBJECT(tmp)))
+		modules_delete(cx, module);
+	JS_SET_RVAL(cx, vp, JSVAL_VOID);
+	return JS_TRUE;
+}
+
 struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **global){
 	struct module *module;
-	JSObject *moduleobj;
+	JSObject *funtmp;
 	jsval tmp;
 
 	if(modules_c == 1000)
@@ -52,6 +63,7 @@ struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **gl
 	*global = JS_NewGlobalObject(cx, &modules_class_global);
 	JS_InitStandardClasses(cx, *global);
 
+
 	tmp = OBJECT_TO_JSVAL(module->o.exports);
 	JS_SetProperty(cx, *global, "exports", &tmp);
 	tmp = OBJECT_TO_JSVAL(*global);
@@ -59,11 +71,18 @@ struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **gl
 	tmp = OBJECT_TO_JSVAL(JS_GetFunctionObject(JS_NewFunction(
 		cx, modules_fun_require, 1, 0, NULL, "require")));
 	JS_SetProperty(cx, *global, "require", &tmp);
-	moduleobj = JS_NewObject(cx, &modules_class_module, NULL, NULL);
-	tmp = OBJECT_TO_JSVAL(moduleobj);
+	module->moduleobj = JS_NewObject(cx, &modules_class_module, NULL, NULL);
+	tmp = OBJECT_TO_JSVAL(module->moduleobj);
 	JS_SetProperty(cx, *global, "module", &tmp);
+
+	JS_AddObjectRoot(cx, &module->moduleobj);
+	JS_SetPrivate(cx, module->moduleobj, module);
 	tmp = STRING_TO_JSVAL(JS_NewStringCopyZ(cx, moduleid));
-	JS_SetProperty(cx, moduleobj, "id", &tmp);
+	JS_SetProperty(cx, module->moduleobj, "id", &tmp);
+	tmp = OBJECT_TO_JSVAL(funtmp = JS_GetFunctionObject(JS_NewFunction(cx,
+		modules_module_fun_remove, 0, 0, NULL, "remove")));
+	JS_SetReservedSlot(cx, funtmp, 0, OBJECT_TO_JSVAL(module->moduleobj));
+	JS_SetProperty(cx, module->moduleobj, "remove", &tmp);
 
 	return module;
 }
@@ -79,15 +98,26 @@ struct module *modules_hook_native(JSContext *cx, module_hook *hook, const char 
 	module->o.hook = hook;
 	modules_a[modules_c++] = module;
 
+	module->moduleobj = JS_NewObject(cx, &modules_class_module, NULL, NULL);
+	JS_AddObjectRoot(cx, &module->moduleobj);
+	JS_SetPrivate(cx, module->moduleobj, module);
+
 	return module;
 }
 
 void modules_delete(JSContext *cx, struct module *module){
+	jsval tmp, fval;
+
 	(modules_a[module->id] = modules_a[--modules_c])->id = module->id;
 
 	JS_free(cx, module->name);
 	if(module->type == MODULE_NORMAL)
 		JS_RemoveObjectRoot(cx, &module->o.exports);
+	JS_SetPrivate(cx, module->moduleobj, NULL);
+	JS_GetProperty(cx, module->moduleobj, "onremove", &fval);
+	if(!JSVAL_IS_VOID(fval))
+		JS_CallFunctionValue(cx, NULL, fval, 0, NULL, &tmp);
+	JS_RemoveObjectRoot(cx, &module->moduleobj);
 	JS_free(cx, module);
 }
 
