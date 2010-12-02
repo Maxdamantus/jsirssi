@@ -108,8 +108,6 @@ struct module *modules_hook_native(JSContext *cx, module_hook *hook, const char 
 void modules_delete(JSContext *cx, struct module *module){
 	jsval tmp, fval;
 
-	(modules_a[module->id] = modules_a[--modules_c])->id = module->id;
-
 	JS_free(cx, module->name);
 	if(module->type == MODULE_NORMAL)
 		JS_RemoveObjectRoot(cx, &module->o.exports);
@@ -118,6 +116,8 @@ void modules_delete(JSContext *cx, struct module *module){
 	if(!JSVAL_IS_VOID(fval))
 		JS_CallFunctionValue(cx, NULL, fval, 0, NULL, &tmp);
 	JS_RemoveObjectRoot(cx, &module->moduleobj);
+
+	(modules_a[module->id] = modules_a[--modules_c])->id = module->id;
 	JS_free(cx, module);
 }
 
