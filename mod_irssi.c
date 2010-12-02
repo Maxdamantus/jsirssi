@@ -36,12 +36,12 @@ static struct JSPropertySpec bind_props[] = {
 	{NULL}
 };
 
-JSObject *mod_irssi_get(JSContext *cx){
+jsval mod_irssi_get(JSContext *cx){
 	JSObject *ret;
 	
 	ret = JS_NewObject(js_cx, &irssi_class, NULL, NULL);
 	JS_DefineProperties(js_cx, ret, irssi_props);
-	return ret;
+	return OBJECT_TO_JSVAL(ret);
 }
 
 static void command_callback(char *args){

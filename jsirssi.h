@@ -16,16 +16,14 @@
 
 /* begin modules.c */
 
-typedef JSObject *module_hook(JSContext*);
+typedef jsval module_hook(JSContext*);
 
 struct module {
 	int id, type;
 	char *name;
 	JSObject *moduleobj;
-	union {
-		JSObject *exports;
-		module_hook *hook;
-	} o;
+	jsval onremove, exports;
+	module_hook *hook;
 } *modules_a[1000];
 int modules_c;
 
@@ -33,7 +31,8 @@ struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **gl
 struct module *modules_hook_native(JSContext *cx, module_hook *hook, const char *moduleid);
 void modules_delete(JSContext *cx, struct module *module);
 void modules_shutdown(JSContext *cx);
-JSObject *modules_require(JSContext *cx, const char *moduleid);
+JSBool modules_require(JSContext *cx, const char *moduleid, jsval *rval);
+JSBool modules_runscript(JSContext *cx, JSObject *global, const char *moduleid);
 
 /* end modules.c */
 /* begin jsirssi.c */

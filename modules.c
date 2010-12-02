@@ -24,11 +24,11 @@ static struct JSClass modules_class_module = {
 
 static JSBool modules_fun_require(JSContext *cx, uintN argc, jsval *vp){
 	char *moduleid;
-	JSObject *exports;
+	jsval exports;
 
 	moduleid = JS_EncodeString(cx, JS_ValueToString(cx, JS_ARGV(cx, vp)[0]));
-	if(exports = modules_require(cx, moduleid))
-		JS_SET_RVAL(cx, vp, OBJECT_TO_JSVAL(exports));
+	if(modules_require(cx, moduleid, &exports))
+		JS_SET_RVAL(cx, vp, exports);
 	else /* todo: throw an error */
 		JS_SET_RVAL(cx, vp, JSVAL_VOID);
 	return JS_TRUE;
@@ -55,16 +55,16 @@ struct module *modules_create(JSContext *cx, const char *moduleid, JSObject **gl
 	module = JS_malloc(cx, sizeof *module);
 	module->type = MODULE_NORMAL;
 	module->name = JS_strdup(cx, moduleid);
-	module->o.exports = JS_NewObject(cx, &modules_class_exports, NULL, NULL);
+	module->exports = OBJECT_TO_JSVAL(JS_NewObject(cx, &modules_class_exports, NULL, NULL));
 	modules_a[module->id = modules_c++] = module;
 
-	JS_AddObjectRoot(cx, &module->o.exports);
+	JS_AddValueRoot(cx, &module->exports);
 
 	*global = JS_NewGlobalObject(cx, &modules_class_global);
 	JS_InitStandardClasses(cx, *global);
 
 
-	tmp = OBJECT_TO_JSVAL(module->o.exports);
+	tmp = module->exports;
 	JS_SetProperty(cx, *global, "exports", &tmp);
 	tmp = OBJECT_TO_JSVAL(*global);
 	JS_SetProperty(cx, *global, "global", &tmp);
@@ -95,7 +95,7 @@ struct module *modules_hook_native(JSContext *cx, module_hook *hook, const char 
 	module = JS_malloc(cx, sizeof *module);
 	module->type = MODULE_NATIVE;
 	module->name = JS_strdup(cx, moduleid);
-	module->o.hook = hook;
+	module->hook = hook;
 	modules_a[modules_c++] = module;
 
 	module->moduleobj = JS_NewObject(cx, &modules_class_module, NULL, NULL);
@@ -108,16 +108,17 @@ struct module *modules_hook_native(JSContext *cx, module_hook *hook, const char 
 void modules_delete(JSContext *cx, struct module *module){
 	jsval tmp, fval;
 
+	(modules_a[module->id] = modules_a[--modules_c])->id = module->id;
+
 	JS_free(cx, module->name);
 	if(module->type == MODULE_NORMAL)
-		JS_RemoveObjectRoot(cx, &module->o.exports);
+		JS_RemoveValueRoot(cx, &module->exports);
 	JS_SetPrivate(cx, module->moduleobj, NULL);
 	JS_GetProperty(cx, module->moduleobj, "onremove", &fval);
 	if(!JSVAL_IS_VOID(fval))
 		JS_CallFunctionValue(cx, NULL, fval, 0, NULL, &tmp);
 	JS_RemoveObjectRoot(cx, &module->moduleobj);
 
-	(modules_a[module->id] = modules_a[--modules_c])->id = module->id;
 	JS_free(cx, module);
 }
 
@@ -143,7 +144,7 @@ JSBool modules_runscript(JSContext *cx, JSObject *global, const char *moduleid){
 	return JS_FALSE;
 }
 
-JSObject *modules_require(JSContext *cx, const char *moduleid){
+JSBool modules_require(JSContext *cx, const char *moduleid, jsval *rval){
 	struct module *module;
 	JSObject *global;
 	int x;
@@ -156,12 +157,11 @@ JSObject *modules_require(JSContext *cx, const char *moduleid){
 		module = modules_create(cx, moduleid, &global);
 		if(!modules_runscript(cx, global, moduleid)){
 			modules_delete(cx, module);
-			return NULL;
+			return JS_FALSE;
 		}
 	}else
 		module = modules_a[x];
 
-	if(module->type == MODULE_NATIVE)
-		return module->o.hook(cx);
-	return module->o.exports;
+	*rval = module->type == MODULE_NATIVE? module->hook(cx) : module->exports;
+	return JS_TRUE;
 }

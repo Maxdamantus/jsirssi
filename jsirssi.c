@@ -46,7 +46,7 @@ struct JSFunctionSpec js_mod_test_funs[] = {
 	{NULL}
 };
 
-JSObject *js_mod_test(JSContext *cx){
+jsval js_mod_test(JSContext *cx){
 	JSObject *ret;
 	jsval tmp;
 
@@ -54,7 +54,7 @@ JSObject *js_mod_test(JSContext *cx){
 	JS_DefineFunctions(cx, ret, js_mod_test_funs);
 	tmp = OBJECT_TO_JSVAL(JS_NewArrayObject(cx, 0, NULL));
 	JS_SetProperty(cx, ret, "a", &tmp);
-	return ret;
+	return OBJECT_TO_JSVAL(ret);
 }
 
 void js_errorhandler(JSContext *cx, const char *msg, JSErrorReport *report){
@@ -88,7 +88,10 @@ void cmd_js_list(char *data, void *server, WI_ITEM_REC *item){
 }
 
 void cmd_js_open(char *data, void *server, WI_ITEM_REC *item){
-	modules_require(js_cx, data);
+	jsval rval;
+
+	if(!modules_require(js_cx, data, &rval))
+		printtext_window(NULL, 0, "Failed to load %s", data);
 }
 
 JSBool js_fun_print(JSContext *cx, uintN argc, jsval *vp){
