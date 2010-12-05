@@ -15,7 +15,7 @@ void js_core_init(){
 
 	js_cx = JS_NewContext(js_rt, 8192);
 	JS_SetOptions(js_cx, JS_GetOptions(js_cx) |
-		JSOPTION_STRICT | JSOPTION_WERROR | JSOPTION_COMPILE_N_GO | JSOPTION_XML |
+		/* JSOPTION_STRICT | JSOPTION_WERROR | */JSOPTION_COMPILE_N_GO | JSOPTION_XML |
 		JSOPTION_JIT);
 	JS_SetVersion(js_cx, JSVERSION_LATEST);
 	JS_SetErrorReporter(js_cx, js_errorhandler);
@@ -69,8 +69,13 @@ void cmd_js(char *data, void *server, WI_ITEM_REC *item){
 
 void cmd_js_exec(char *data, void *server, WI_ITEM_REC *item){
 	jsval rval;
+	char *st;
 
 	JS_EvaluateScript(js_cx, JS_GetGlobalObject(js_cx), data, strlen(data), "<cmdline>", 0, &rval);
+	if(!JSVAL_IS_VOID(rval)){
+		printtext_window(NULL, 0, "%s", st = JS_EncodeString(js_cx, JS_ValueToString(js_cx, rval)));
+		JS_free(js_cx, st);
+	}
 	JS_GC(js_cx);
 }
 
@@ -99,7 +104,7 @@ JSBool js_fun_print(JSContext *cx, uintN argc, jsval *vp){
 	char *st;
 
 	for(x = 0; x < argc; x++){
-		printtext_window(NULL, 0, "%s", st = JS_EncodeString(cx, JS_ValueToString(cx, JS_ARGV(js_cx, vp)[x])));
+		printtext_window(NULL, 0, "%s", st = JS_EncodeString(cx, JS_ValueToString(cx, JS_ARGV(cx, vp)[x])));
 		JS_free(cx, st);
 	}
 	JS_SET_RVAL(js_cx, vp, JSVAL_VOID);
